@@ -40,8 +40,7 @@ def compute_mi_pair(args):
 
 
 @calc_time
-def calculate_MIC(data, 
-                  num_processes=None):
+def calculate_MIC(data, num_processes=None):
     """
     Calculate the MIC (Maximal Information Coefficient) matrix for the input data.
 
@@ -53,39 +52,28 @@ def calculate_MIC(data,
     - mi_matrix: 2D symmetric MIC matrix (cells x cells)
     """
     num_cells = data.shape[0]
-    mic_matrix = np.zeros((num_cells, num_cells))
 
     # Determine the number of processes
     if num_processes is None:
         num_processes = cpu_count()
 
-    # Prepare all unique pairs for MIC computation
-    #pairs = [(i, j, data) for i in range(num_cells) for j in range(i, num_cells)] # whole matrix
-    pairs = [(i, j, data) for i in range(num_cells) for j in range(i + 1, num_cells)] # Upper triangular
+    # Prepare all unique pairs for MIC computation (upper triangular)
+    pairs = [(i, j, data) for i in range(num_cells) for j in range(i + 1, num_cells)]
 
     # Use multiprocessing to compute MIC for all pairs
     with Pool(processes=num_processes, initializer=init_mine) as pool:
         results = pool.map(compute_mi_pair, pairs)
 
-    row_indices = []
-    col_indices = []
-    values = []
+    # Convert results to a NumPy array for faster operations
+    results_array = np.array(results)  # Convert list of tuples to 2D array
 
+    # Extract columns from the results array
+    row_indices = results_array[:, 0].astype(int)  # First column is row index
+    col_indices = results_array[:, 1].astype(int)  # Second column is column index
+    values = results_array[:, 2]                   # Third column is MIC values
 
-    # Fill the MIC matrix (FULL)
-    #for i, j, mic_value in results:
-        #mic_matrix[i, j] = mic_value
-        #mic_matrix[j, i] = mic_value  # MIC is symmetric
-
-    # Fill the MIC matrix (Upper Triangular)
-    for i, j, mic_value in results:
-        row_indices.append(i)
-        col_indices.append(j)
-        values.append(mic_value)
-
-    mic_matrix = sp.csr_matrix((values, (row_indices, col_indices)), shape=(num_cells, num_cells))
-    
-    #np.fill_diagonal(mic_matrix, 0)
+    # Create a sparse matrix directly
+    mic_matrix = sp.coo_matrix((values, (row_indices, col_indices)), shape=(num_cells, num_cells)).tocsr()
 
     return mic_matrix
 
@@ -140,9 +128,13 @@ def generate_mi_mat(adata,
 
         # Perform PCA
         if use_highly_variable:
-            sc.tl.pca(_adata, use_highly_variable=True)
+            sc.pp.pca(_adata, mask_var='highly_variable')   # 1.10.3
+            #sc.pp.pca(_adata, use_highly_variable=True)
+            print("Uses HVG when PCA")
         else:
-            sc.tl.pca(_adata, use_highly_variable=False)
+            sc.pp.pca(_adata)   # 1.10.3
+            #sc.pp.pca(_adata, use_highly_variable=False)
+            print("NOT use HVG when PCA")
 
         # Extract PCA matrix
         pca_mat = _adata.obsm['X_pca'][:, :n_components]
@@ -152,10 +144,10 @@ def generate_mi_mat(adata,
     mi_matrix = calculate_MIC(pca_mat, num_processes=num_processes)
 
     # Set diagonal elements to zero (self-MIC not meaningful)
-    np.fill_diagonal(mi_matrix, 0)
+    #np.fill_diagonal(mi_matrix, 0)
 
     # Store MIC matrix in the AnnData object
-    _adata.obsp[mi_key] = sp.csr_matrix(mi_matrix)
+    adata.obsp[mi_key] = mi_matrix
 
-    return _adata
+    return adata
 
