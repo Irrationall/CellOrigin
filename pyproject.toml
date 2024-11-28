@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "CellOrigin"
+version = "0.99"
+description = "A package for predicting cell fate"
+authors = [
+    { name = "Junseo Seo", email = "juneseo99@kaist.ac.kr, juneseo.seo@gmail.com" },
+    { name = "Hwisoo Choi", email = "TBD" }
+]
+readme = "README.md"
+license = { file = "LICENSE" }
+repository = "https://github.com/Irrationall/CellOrigin"
+keywords = ["singlecell", "cell-fate", "Relative dimension", "MIC"]
+
+[project.dependencies]
+python = ">=3.6, <3.13"
+numpy = ">=1.18, <2.0"
+minepy = "*"
+scanpy = ">=1.8"
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov"]
+
+[project.urls]
+homepage = "https://github.com/Irrationall/CellOrigin"
+repository = "https://github.com/Irrationall/CellOrigin"
+issue-tracker = "https://github.com/Irrationall/CellOrigin/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
