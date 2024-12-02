@@ -4,6 +4,7 @@
   
 ## Prerequisites
 * [minepy ver.1.2.6](https://github.com/minepy/minepy)
+* numpy < 2.0 (Currently, mienpy doesn't work with numpy 2.0 or higher version)
 
 
 &nbsp;
