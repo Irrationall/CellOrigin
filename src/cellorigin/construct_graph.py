@@ -5,6 +5,7 @@ import scipy.sparse as sp
 import scanpy as sc
 from tqdm import tqdm
 from scipy.sparse import coo_array
+import time
 
 
 
@@ -31,6 +32,7 @@ def _generate_graph_original(matrix):
     - graph: NetworkX graph
     - threshold: MIC threshold used
     """
+    
     low, high = 0, 1
 
     while high - low > 1e-4:
@@ -42,19 +44,23 @@ def _generate_graph_original(matrix):
         temp_matrix.eliminate_zeros()
         
         # Create graph
-        graph = nx.from_scipy_sparse_array(temp_matrix)
+        directed_graph = nx.from_scipy_sparse_array(temp_matrix, create_using=nx.DiGraph)
+        graph = directed_graph.to_undirected()
 
         # Check connectivity
         if nx.is_connected(graph):
-            high = threshold
-        else:
             low = threshold
+            print(f'threshold: {low}')
+        else:
+            high = threshold
 
     # Finalize threshold and apply it to the matrix
     threshold = low
     matrix.data[matrix.data < threshold] = 0
     matrix.eliminate_zeros()
-    graph = nx.from_scipy_sparse_array(matrix)
+    
+    directed_graph = nx.from_scipy_sparse_array(matrix, create_using=nx.DiGraph)
+    graph = directed_graph.to_undirected()
 
     return graph, threshold
 
@@ -175,15 +181,11 @@ def generate_graph(adata,
     if method not in method_list:
         raise ValueError(f"Invalid method '{method}'. Method should be one of {method_list}.")
 
-    # Convert sparse matrix to dense (upper triangular) for processing
     # Get MIC matrix
     if sp.issparse(adata.obsp[mic_key]) :
         matrix = adata.obsp[mic_key].copy()
     else :
         matrix = sp.csr_matrix(adata.obsp[mic_key].copy())
-
-    # Symmetrize the matrix (sparse triangular to full)
-    matrix = (matrix + matrix.T).tocsr()
 
     # Generate the graph based on the selected method
     if method == "Original":
