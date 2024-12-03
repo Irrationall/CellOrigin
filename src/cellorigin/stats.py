@@ -5,7 +5,7 @@ from scipy.stats import mannwhitneyu
 from statsmodels.stats.multitest import multipletests
 from tqdm import tqdm
 import numpy as np
-from typing import List
+from typing import List, Union
 
 
 
@@ -92,7 +92,7 @@ class FatePredictor:
 
 
 
-    def _resolve_tie(self):
+    def _resolve_tie(self, na_value):
         """
         Resolve ties in predicted fates by performing pairwise Mann-Whitney U tests.
         If there are exactly two clusters in `predicted_fate`, decide the fate using the same criteria.
@@ -113,8 +113,8 @@ class FatePredictor:
                 mask_b = self.reld_adata.var[self.group_by] == cluster_b
 
                 # Extract the group values
-                values_a = np.nan_to_num(self.reld_adata[row_idx, mask_a].X.toarray().flatten(), nan=np.inf)
-                values_b = np.nan_to_num(self.reld_adata[row_idx, mask_b].X.toarray().flatten(), nan=np.inf)
+                values_a = np.nan_to_num(self.reld_adata[row_idx, mask_a].X.toarray().flatten(), nan=na_value)
+                values_b = np.nan_to_num(self.reld_adata[row_idx, mask_b].X.toarray().flatten(), nan=na_value)
 
 
 
@@ -131,7 +131,8 @@ class FatePredictor:
     
     
     def predict_fate(self, 
-                     resolve_tie=True):
+                     resolve_tie=True,
+                     na_value: Union[float, str] = np.inf):
 
         """
         Perform the statistical test for each row of reld_adataa against the clusters in var.
@@ -145,6 +146,10 @@ class FatePredictor:
         # Ensure 'self.group_by' column exists in var
         if self.group_by not in self.reld_adata.var:
             raise ValueError(f'The {self.group_by} column must be present in reld_adata.var for the test.')
+        
+        # Assign NA
+        if na_value == "max" :
+            na_value = self.reld_adata.X.nanmax() + ((self.reld_adata.X.nanmax())-(self.reld_adata.X.nanmin()))*0.01
 
         # Get unique clusters
         clusters = self.reld_adata.var[self.group_by].unique()
@@ -165,8 +170,8 @@ class FatePredictor:
             # Perform the test row-wise
             for row_idx in range(self.reld_adata.n_obs):
                 _, pvalue = mannwhitneyu(
-                    np.nan_to_num(group_values[row_idx].toarray().flatten(), nan=np.inf) if sp.issparse(group_values) else np.nan_to_num(group_values[row_idx], nan=np.inf),
-                    np.nan_to_num(rest_values[row_idx].toarray().flatten(), nan=np.inf) if sp.issparse(rest_values) else np.nan_to_num(rest_values[row_idx], nan=np.inf),
+                    np.nan_to_num(group_values[row_idx].toarray().flatten(), nan=np.inf) if sp.issparse(group_values) else np.nan_to_num(group_values[row_idx], nan=na_value),
+                    np.nan_to_num(rest_values[row_idx].toarray().flatten(), nan=np.inf) if sp.issparse(rest_values) else np.nan_to_num(rest_values[row_idx], nan=na_value),
                     alternative='less'
                 )
                 p_values[row_idx, cluster_idx] = pvalue
@@ -200,8 +205,8 @@ class FatePredictor:
 
                 # Check criteria: adj p-value < 0.05 and median(cluster) < median(rest)
                 if (self.reld_adata.obs.loc[row_idx, f"{cluster}_adj_p"] < 0.05 and
-                    np.median(np.nan_to_num(group_values, nan=np.inf)) <
-                    np.median(np.nan_to_num(rest_values, nan=np.inf))
+                    np.median(np.nan_to_num(group_values, nan=na_value)) <
+                    np.median(np.nan_to_num(rest_values, nan=na_value))
                     ):
                     row_fates.append(cluster)
 
@@ -212,7 +217,7 @@ class FatePredictor:
         print("FDR adjusted p-values added to reld_adata.obs")
 
         if resolve_tie and len(clusters) > 2 :
-            self._resolve_tie()
+            self._resolve_tie(na_value)
 
         def list_to_string(lst) :
             if not lst :
