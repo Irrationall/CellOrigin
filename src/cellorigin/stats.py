@@ -132,7 +132,7 @@ class FatePredictor:
     
     def predict_fate(self, 
                      resolve_tie=True,
-                     na_value: Union[float, str] = np.inf):
+                     na_value: Union[float, str] = "max"):
 
         """
         Perform the statistical test for each row of reld_adataa against the clusters in var.
@@ -146,10 +146,14 @@ class FatePredictor:
         # Ensure 'self.group_by' column exists in var
         if self.group_by not in self.reld_adata.var:
             raise ValueError(f'The {self.group_by} column must be present in reld_adata.var for the test.')
-        
+
         # Assign NA
         if na_value == "max" :
             na_value = self.reld_adata.X.nanmax() + ((self.reld_adata.X.nanmax())-(self.reld_adata.X.nanmin()))*0.01
+
+        print(f'Fill NA with {na_value}.')
+
+        is_sparse = sp.issparse(self.reld_adata.X)
 
         # Get unique clusters
         clusters = self.reld_adata.var[self.group_by].unique()
@@ -164,14 +168,18 @@ class FatePredictor:
             rest_mask = ~group_mask
 
             # Extract group and rest columns in bulk
-            group_values = self.reld_adata.X[:, group_mask]
-            rest_values = self.reld_adata.X[:, rest_mask]
+            if is_sparse:
+                group_values = self.reld_adata.X[:, group_mask].toarray()
+                rest_values = self.reld_adata.X[:, ~group_mask].toarray()
+            else:
+                group_values = self.reld_adata.X[:, group_mask]
+                rest_values = self.reld_adata.X[:, ~group_mask]
 
             # Perform the test row-wise
             for row_idx in range(self.reld_adata.n_obs):
                 _, pvalue = mannwhitneyu(
-                    np.nan_to_num(group_values[row_idx].toarray().flatten(), nan=np.inf) if sp.issparse(group_values) else np.nan_to_num(group_values[row_idx], nan=na_value),
-                    np.nan_to_num(rest_values[row_idx].toarray().flatten(), nan=np.inf) if sp.issparse(rest_values) else np.nan_to_num(rest_values[row_idx], nan=na_value),
+                    np.nan_to_num(group_values[row_idx].flatten(), nan=na_value),
+                    np.nan_to_num(rest_values[row_idx].flatten(), nan=na_value),
                     alternative='less'
                 )
                 p_values[row_idx, cluster_idx] = pvalue
@@ -196,13 +204,22 @@ class FatePredictor:
         predicted_fate = []
 
         for row_idx in tqdm(self.reld_adata.obs.index, desc='Classification in progress...'):
+            
             row_fates = []
             for cluster_idx, cluster in enumerate(clusters):
+                
                 group_mask = cluster_masks[cluster]
 
-                group_values = self.reld_adata[row_idx, group_mask].X.toarray().flatten() if sp.issparse(group_values) else group_values.flatten()
-                rest_values = self.reld_adata[row_idx, ~group_mask].X.toarray().flatten() if sp.issparse(rest_values) else rest_values.flatten()
+                if is_sparse:
+                    group_values = self.reld_adata[row_idx, group_mask].X.toarray()
+                    rest_values = self.reld_adata[row_idx, ~group_mask].X.toarray()
+                else:
+                    group_values = self.reld_adata[row_idx, group_mask].X
+                    rest_values = self.reld_adata[row_idx, ~group_mask].X
 
+                group_values = group_values.flatten()
+                rest_values = rest_values.flatten()
+                        
                 # Check criteria: adj p-value < 0.05 and median(cluster) < median(rest)
                 if (self.reld_adata.obs.loc[row_idx, f"{cluster}_adj_p"] < 0.05 and
                     np.median(np.nan_to_num(group_values, nan=na_value)) <
@@ -224,7 +241,7 @@ class FatePredictor:
                 return 'None'
             else :
                 return ' & '.join(lst)
-            
+
         self.reld_adata.obs['predicted_fate'] = self.reld_adata.obs['predicted_fate'].apply(list_to_string)
             
         return None
