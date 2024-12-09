@@ -10,7 +10,9 @@
 &nbsp;
 
 ## Installation
-
+git clone https://github.com/Irrationall/CellOrigin
+cd CellOrigin
+pip install -e .
 
 &nbsp;
 
