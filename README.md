@@ -15,6 +15,9 @@ git clone https://github.com/Irrationall/CellOrigin
 
 cd CellOrigin
 
+pip install .
+
+# install in editable mode:
 pip install -e .
 ```
 
