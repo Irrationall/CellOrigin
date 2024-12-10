@@ -36,7 +36,7 @@ This guide provides a step-by-step workflow to recompile **Minepy** for compatib
 conda create -n newminepy python=3.10
 conda activate newminepy
 ```
-* Step 2: Install **Scanpy** and clone minepy repository. The recent version of **Scanpy** automatically installs **NumPy > 2.0**
+* Step 2: Install **Scanpy** and clone **Minepy** repository. The recent version of **Scanpy** automatically installs **NumPy > 2.0**
 ```bash
 (newminepy) pip install scanpy
 (newminepy) git clone https://github.com/minepy/minepy.git
