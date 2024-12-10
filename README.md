@@ -51,19 +51,19 @@ conda activate newminepy
 A new mine.c file is created in the ./minepy directory.
 ```bash
 # compile c file
-gcc -shared -pthread -fPIC -fwrapv -O2 \
-    -I/opt/anaconda/envs/newminepy/include/python3.10 \
-    -I/opt/anaconda/envs/newminepy/lib/python3.10/site-packages/numpy/_core/include \
-    -o minepy/mine.new.so minepy/mine.c
+(newminepy) gcc -shared -pthread -fPIC -fwrapv -O2 \
+                -I/opt/anaconda/envs/newminepy/include/python3.10 \
+                -I/opt/anaconda/envs/newminepy/lib/python3.10/site-packages/numpy/_core/include \
+                -o minepy/mine.new.so minepy/mine.c
 
 # Install minepy
-pip install .
+(newminepy) pip install .
 ```
 * Step 4: Check **Minepy** works well
 ```bash
 # Go outside of minepy folder
-cd ~
-python
+(newminepy) cd ~
+(newminepy) python
 ```
 ```python
 from minepy import MINE
