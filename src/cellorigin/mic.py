@@ -10,8 +10,15 @@ from typing import Optional, Dict
 from packaging import version
 import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler() 
+    ]
+)
 
-
+logger = logging.getLogger(__name__)
 
 # Timing decorator for performance tracking
 def calc_time(func):
