@@ -206,9 +206,13 @@ class FatePredictor:
         # Predict fate based on criteria
         predicted_fate = []
 
+        FDR_OR_NOT = 'Adjusted p-value' if use_fdr else 'p-value'
+        print(f'{FDR_OR_NOT} used for classification.')
+
         for row_idx in tqdm(self.reld_adata.obs.index, desc='Classification in progress...'):
             
             row_fates = []
+
             for cluster_idx, cluster in enumerate(clusters):
                 
                 group_mask = cluster_masks[cluster]
@@ -224,10 +228,8 @@ class FatePredictor:
                 rest_values = rest_values.flatten()
 
                 p_value_key = f"{cluster}_adj_p" if use_fdr else f"{cluster}_p"
-
-                print(f'{p_value_key} used for classification.')
                         
-                # Check criteria: adj p-value < 0.05 and median(cluster) < median(rest)
+                # Check criteria: (adj: optional) p-value < 0.05 and median(cluster) < median(rest)
                 if (self.reld_adata.obs.loc[row_idx, p_value_key] < 0.05 and
                     np.median(np.nan_to_num(group_values, nan=na_value)) <
                     np.median(np.nan_to_num(rest_values, nan=na_value))
