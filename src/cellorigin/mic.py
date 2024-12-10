@@ -1,9 +1,14 @@
 from multiprocessing import Pool, cpu_count
+from anndata import AnnData
 from minepy import MINE
 import scipy.sparse as sp
 import scanpy as sc
 import numpy as np
 import time
+
+from typing import Optional, Dict
+from packaging import version
+import logging
 
 
 
@@ -80,15 +85,64 @@ def calculate_MIC(data, num_processes=None):
 
 
 
+def _prepare_data_for_pca(adata: AnnData, 
+                          use_highly_variable: bool, 
+                          hv_kwargs: Dict, 
+                          use_scale: bool) -> AnnData:
+    """
+    Prepares the AnnData object for PCA by optionally subsetting to highly variable genes and scaling data.
+
+    Parameters:
+    - adata: AnnData object
+    - use_highly_variable: Whether to subset to highly variable genes
+    - hv_kwargs: Keyword arguments for `sc.pp.highly_variable_genes`
+    - use_scale: Whether to scale the data
+
+    Returns:
+    - adata: Prepared AnnData object
+    """
+
+    if use_highly_variable:
+        sc.pp.highly_variable_genes(adata, **hv_kwargs)
+        logger.info(f"Found {adata.var.highly_variable.sum()} highly variable genes.")
+    
+    if use_scale:
+        sc.pp.scale(adata)
+        logger.info("Data scaled before PCA.")
+
+    if use_highly_variable:
+        if version.parse(sc.__version__) >= version.parse("1.10.0"):
+            # Use `mask_var` argument for Scanpy versions >= 1.10.0
+            logger.info("Using `mask_var='highly_variable'` for PCA.")
+            sc.pp.pca(adata, mask_var='highly_variable')
+
+        else:
+            # Use `use_highly_variable` argument for older Scanpy versions
+            logger.info("Using `use_highly_variable=True` for PCA (deprecated in scanpy 1.10.0).")
+            sc.pp.pca(adata, use_highly_variable=True)
+    else:
+        # PCA without subsetting to HVGs
+        sc.pp.pca(adata)
+        logger.info("PCA performed without subsetting to HVGs.")
+
+    logger.info("PCA completed.")
+
+    return adata
+
+
+
+
+logger = logging.getLogger(__name__)
+
 @calc_time
 def generate_mi_mat(adata, 
                      use_highly_variable: bool = False,
-                     hv_kwargs: dict = {'subset': False},
+                     hv_kwargs: Optional[Dict] = None,
                      use_scale: bool = False,
                      n_components: int = 30,
                      num_processes: int = 1,
                      force_PCA: bool = False,
-                     mi_key: str = 'MIC'):
+                     mic_key: str = 'MIC'):
     """
     Generate an MIC matrix and store it in the AnnData object.
 
@@ -110,44 +164,29 @@ def generate_mi_mat(adata,
 
     # Check if PCA is already computed and can be reused
     if 'X_pca' in _adata.obsm and not force_PCA:
-        print('X_pca already in adata.obsm. Calculating MIC with this matrix.')
+        logger.info('X_pca already in adata.obsm. Using existing PCA matrix.')
         pca_mat = _adata.obsm['X_pca'][:, :n_components]
 
     else:
-        print("No X_pca in adata.obsm. Performing PCA with assigned parameters.")
-        
-        # Identify highly variable genes if applicable
-        if use_highly_variable:
-            hv_kwargs = hv_kwargs or {}
-            sc.pp.highly_variable_genes(_adata, **hv_kwargs)
-            print(f"Found {_adata.var.highly_variable.sum()} highly variable genes.")
-        
-        # Scale the data if required
-        if use_scale:
-            sc.pp.scale(_adata)
-
-        # Perform PCA
-        if use_highly_variable:
-            sc.pp.pca(_adata, mask_var='highly_variable')   # 1.10.3
-            #sc.pp.pca(_adata, use_highly_variable=True)
-            print("Uses HVG when PCA")
+        if 'X_pca' in _adata.obsm and force_PCA:
+            logger.info("Force PCA is enabled. Recomputing PCA and overwriting existing X_pca.")
+            
         else:
-            sc.pp.pca(_adata)   # 1.10.3
-            #sc.pp.pca(_adata, use_highly_variable=False)
-            print("NOT use HVG when PCA")
-
-        # Extract PCA matrix
+            logger.info("Performing PCA with assigned parameters.")
+        
+        _adata = _prepare_data_for_pca(_adata, use_highly_variable, hv_kwargs, use_scale)
         pca_mat = _adata.obsm['X_pca'][:, :n_components]
         
     # Calculate MIC matrix
-    print("Calculating MIC matrix...")
+    logger.info("Calculating MIC matrix...")
     mi_matrix = calculate_MIC(pca_mat, num_processes=num_processes)
 
     # Set diagonal elements to zero (self-MIC not meaningful)
     #np.fill_diagonal(mi_matrix, 0)
 
     # Store MIC matrix in the AnnData object
-    adata.obsp[mi_key] = mi_matrix
+    adata.obsp[mic_key] = mi_matrix
+    logger.info(f"MIC matrix stored in adata.obsp[{mic_key}].")
 
     return adata
 

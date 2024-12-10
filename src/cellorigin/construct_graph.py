@@ -1,10 +1,10 @@
+from anndata import AnnData
 import numpy as np
 import networkx as nx
 import warnings
 import scipy.sparse as sp
 import scanpy as sc
 from tqdm import tqdm
-from scipy.sparse import coo_array
 import time
 
 
@@ -132,7 +132,7 @@ def _get_graph_and_diff(matrix: sp.spmatrix,
     Parameters:
     - matrix: Sparse MIC matrix (CSR or CSC format)
     - threshold: Threshold value to apply
-    - target_edgenum: Target number of edges
+    - target_edgenum: Target number of edges when multiply this number
 
     Returns:
     - graph: NetworkX graph generated from the thresholded matrix
@@ -156,14 +156,15 @@ def _get_graph_and_diff(matrix: sp.spmatrix,
 
 
 @calc_time
-def generate_graph(adata,
-                   mic_key, 
-                   method="Original", 
-                   number_of_multiples=None):
+def generate_graph(adata: AnnData,
+                   mic_key: str, 
+                   method: str = "Original", 
+                   number_of_multiples: int = None):
     """
     Generate a graph from a sparse triangular MIC matrix.
 
     Parameters:
+    - adata: name of AnnData object contain MIC matrix
     - mic_matrix: Sparse upper triangular MIC matrix (CSR format)
     - method: Method to generate the graph ("Original" or "Multiples")
     - number_of_multiples: Target edge count as a multiple of nodes (used only with "Multiples" method)
@@ -190,11 +191,16 @@ def generate_graph(adata,
     # Generate the graph based on the selected method
     if method == "Original":
         graph, threshold = _generate_graph_original(matrix)
+
     elif method == "Multiples":
+
         if number_of_multiples is None:
             raise ValueError("`number_of_multiples` must be specified for the 'Multiples' method.")
+        
         target_edges = matrix.shape[0] * number_of_multiples
+
         print(f"Target number of edges: {target_edges}")
+
         graph, threshold = _generate_graph_multiples(matrix, target_edges)
 
         # Warn if the graph has disconnected components

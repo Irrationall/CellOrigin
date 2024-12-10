@@ -6,3 +6,6 @@ from .mic import generate_mi_mat
 
 # Import functions from construct_graph.py
 from .construct_graph import generate_graph
+
+# Import class from stats.py
+from .stats import FatePredictor

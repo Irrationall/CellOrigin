@@ -1,4 +1,5 @@
 import anndata
+from anndata import AnnData
 import pandas as pd
 import scipy.sparse as sp
 from scipy.stats import mannwhitneyu
@@ -12,7 +13,7 @@ from typing import List, Union
 
 class FatePredictor:
     def __init__(self, 
-                 adata, 
+                 adata: AnnData, 
                  reld_key: str, 
                  group_by: str, 
                  source: str, 
@@ -131,12 +132,13 @@ class FatePredictor:
     
     
     def predict_fate(self, 
-                     resolve_tie=True,
-                     na_value: Union[float, str] = "max"):
+                     resolve_tie: bool = True,
+                     na_value: Union[float, str] = "max",
+                     use_fdr: bool = True):
 
         """
         Perform the statistical test for each row of reld_adataa against the clusters in var.
-        Adds p-values for each cluster as new columns in reld_adata.obs.
+        Adds p-values and adjusted p-values for each cluster as new columns in reld_adata.obs.
         """
 
         if not hasattr(self, 'reld_adata'):
@@ -188,6 +190,8 @@ class FatePredictor:
         for cluster_idx, cluster in enumerate(clusters):
             self.reld_adata.obs[f"{cluster}_p"] = p_values[:, cluster_idx]
 
+        print("Primary tests completed and p-values added to reld_adata.obs.")    
+
         # Apply FDR correction for each group's p-values separately
         for cluster_idx, cluster in enumerate(clusters):
             raw_pvalues = p_values[:, cluster_idx]
@@ -196,8 +200,7 @@ class FatePredictor:
             # Add FDR-corrected p-values to reld_adata.obs
             self.reld_adata.obs[f"{cluster}_adj_p"] = fdr_corrected_pvalues
 
-
-        print("Primary tests completed and p-values added to reld_adata.obs.")
+        print("FDR adjusted p-values added to reld_adata.obs")
 
 
         # Predict fate based on criteria
@@ -219,9 +222,13 @@ class FatePredictor:
 
                 group_values = group_values.flatten()
                 rest_values = rest_values.flatten()
+
+                p_value_key = f"{cluster}_adj_p" if use_fdr else f"{cluster}_p"
+
+                print(f'{p_value_key} used for classification.')
                         
                 # Check criteria: adj p-value < 0.05 and median(cluster) < median(rest)
-                if (self.reld_adata.obs.loc[row_idx, f"{cluster}_adj_p"] < 0.05 and
+                if (self.reld_adata.obs.loc[row_idx, p_value_key] < 0.05 and
                     np.median(np.nan_to_num(group_values, nan=na_value)) <
                     np.median(np.nan_to_num(rest_values, nan=na_value))
                     ):
@@ -230,8 +237,6 @@ class FatePredictor:
             predicted_fate.append(row_fates)
 
         self.reld_adata.obs['predicted_fate'] = predicted_fate
-
-        print("FDR adjusted p-values added to reld_adata.obs")
 
         if resolve_tie and len(clusters) > 2 :
             self._resolve_tie(na_value)
