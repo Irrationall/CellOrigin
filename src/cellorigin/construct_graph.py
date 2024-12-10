@@ -5,16 +5,19 @@ import warnings
 import scipy.sparse as sp
 import scanpy as sc
 from tqdm import tqdm
+from functools import wraps
 import time
 
 
 
+
 def calc_time(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f"Execution time for {func.__name__}: {end_time - start_time} seconds")
+        print(f"Execution time for {func.__name__}: {end_time - start_time:.2f} seconds")
         return result
     return wrapper
 

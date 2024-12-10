@@ -3,14 +3,16 @@
 import os
 import time
 import warnings
-from functools import partial
+from functools import partial, wraps
 from multiprocessing import Pool
-
 import networkx as nx
 import numpy as np
 import scipy as sc
 from joblib import Parallel, delayed
 from tqdm import tqdm
+
+
+
 
 # Limit the number of threads used by numerical libraries
 os.environ['OMP_NUM_THREADS'] = '1'       # For OpenMP (used by many libraries)
@@ -27,11 +29,12 @@ PRECISION = 1e-8
 
 
 def calc_time(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f"Execution time for {func.__name__}: {end_time - start_time} seconds")
+        print(f"Execution time for {func.__name__}: {end_time - start_time:.2f} seconds")
         return result
     return wrapper
 

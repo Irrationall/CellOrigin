@@ -7,8 +7,12 @@ import numpy as np
 import time
 
 from typing import Optional, Dict
+from functools import wraps
 from packaging import version
 import logging
+
+
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,13 +24,17 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
+
+
 # Timing decorator for performance tracking
 def calc_time(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f"Execution time for {func.__name__}: {end_time - start_time} seconds")
+        print(f"Execution time for {func.__name__}: {end_time - start_time:.2f} seconds")
         return result
     return wrapper
 
