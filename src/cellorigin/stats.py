@@ -125,11 +125,8 @@ class FatePredictor:
                 values_b = self.reld_adata[row_idx, mask_b].X.toarray().flatten()
     
                 # Replace 0 with a large value, then replace that value with na_value
-                large_value = values_a.max() + 1 
-                values_a[values_a == 0] = large_value
-                values_b[values_b == 0] = large_value
-                values_a = np.nan_to_num(values_a, nan=na_value, posinf=na_value)
-                values_b = np.nan_to_num(values_b, nan=na_value, posinf=na_value)
+                values_a[values_a == 0] = na_value
+                values_b[values_b == 0] = na_value
     
                 # Perform Mann-Whitney U test
                 _, pvalue = mannwhitneyu(values_a, values_b, alternative='two-sided')
@@ -176,10 +173,11 @@ class FatePredictor:
         if na_value == "max":
             # Find the maximum of non-zero values
             non_zero_max = self.reld_adata.X.data.max() if sp.issparse(self.reld_adata.X) and np.any(self.reld_adata.X.data != 0) else np.max(self.reld_adata.X[self.reld_adata.X != 0], initial=0)
+            non_zero_min = self.reld_adata.X.data.min() if sp.issparse(self.reld_adata.X) and np.any(self.reld_adata.X.data != 0) else np.min(self.reld_adata.X[self.reld_adata.X != 0], initial=0)
 
             # Set na_value if the maximum is greater than 0 (i.e., there are non-zero values)
             if non_zero_max > 0:
-                na_value = non_zero_max + non_zero_max * 0.01
+                na_value = non_zero_max + (non_zero_max - non_zero_min) * 0.01
             else:
                 na_value = 1  # If all values are 0 or negative, set an arbitrary positive value
 
@@ -209,14 +207,9 @@ class FatePredictor:
                 group_row = group_values[row_idx].flatten()
                 rest_row = rest_values[row_idx].flatten()
 
-                # Temporarily replace 0s with a value larger than the maximum (large_value)
-                large_value = na_value + 1
-                group_row[group_row == 0] = large_value
-                rest_row[rest_row == 0] = large_value
-
                 # Replace large_value (originally 0s) with na_value
-                group_row = np.nan_to_num(group_row, nan=na_value, posinf=na_value)
-                rest_row = np.nan_to_num(rest_row, nan=na_value, posinf=na_value)
+                group_row[group_row == 0] = na_value
+                rest_row[rest_row == 0] = na_value
 
                 _, pvalue = mannwhitneyu(
                     group_row, rest_row, alternative="less"
@@ -257,14 +250,11 @@ class FatePredictor:
                 group_values = self.reld_adata[row_idx, group_mask].X.toarray().flatten()
                 rest_values = self.reld_adata[row_idx, ~group_mask].X.toarray().flatten()
 
-                # Temporarily replace 0s with a value larger than the maximum (large_value)
-                large_value = na_value + 1
-                group_values[group_values == 0] = large_value
-                rest_values[rest_values == 0] = large_value
-
                 # Replace large_value (originally 0s) with na_value
-                group_values = np.nan_to_num(group_values, nan=na_value, posinf=na_value)
-                rest_values = np.nan_to_num(rest_values, nan=na_value, posinf=na_value)
+                group_values[group_values == 0] = na_value
+                rest_values[rest_values == 0] = na_value
+
+                
 
                 p_value_key = f"{cluster}_adj_p" if use_fdr else f"{cluster}_p"
 
