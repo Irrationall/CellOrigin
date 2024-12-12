@@ -12,8 +12,6 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 
 
-
-
 # Limit the number of threads used by numerical libraries
 os.environ['OMP_NUM_THREADS'] = '1'       # For OpenMP (used by many libraries)
 os.environ['MKL_NUM_THREADS'] = '1'       # For Intel MKL
@@ -369,11 +367,39 @@ def get_initial_measure(graph,
 
 ### RUN RDIM ###
 @calc_time
-def calculate_relative_dimension(graph: nx.Graph,
+def calculate_relative_dimension(adata: AnnData,
+                                 graph: nx.Graph,
                                  time_arr: np.array,
+                                 reld_key: str = "relative_dimension",
                                  batch_size: int = 1,
-                                num_processes : int = 1) :
-    
-    rdim = run_all_sources(graph, time_arr, batch_size=batch_size, n_workers=num_processes)[0]
+                                num_processes : int = 1
+                                ) :
+    """
+    Calculate the relative dimension matrix and automatically add it to the AnnData object.
 
-    return rdim
+    Parameters:
+    - adata: The input AnnData object.
+    - time_arr: Array of time steps for diffusion.
+    - obsp_key: Key to the graph in obsp.
+    - reld_key: Key to store the relative dimension matrix in obsp.
+    - batch_size: Number of nodes to process in each batch.
+    - num_processes: Number of workers for parallel processing.
+    """
+    
+    # Calculate the relative dimension matrix
+    rdim = run_all_sources(graph, time_arr, batch_size=batch_size, n_workers=num_processes)[0]
+    
+    # Check if nanmin is not 0 and fill NA with 0 for sparse representation
+    nanmin = np.nanmin(rdim)
+    
+    if nanmin != 0:
+        print(f"Minimum non-NaN value in the relative dimension matrix is {nanmin}. Filling NaN values with 0 for sparse representation.")
+        rdim[np.isnan(rdim)] = 0
+        rdim_sparse = sp.csr_matrix(rdim)
+        adata.obsp[reld_key] = rdim_sparse
+        print(f"Relative dimension matrix with key '{reld_key}' added to `adata.obsp` as a sparse matrix.")
+    else:
+        adata.obsp[reld_key] = rdim
+        print(f"Relative dimension matrix with key '{reld_key}' added to `adata.obsp`.")
+
+    return None
