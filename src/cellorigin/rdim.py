@@ -7,7 +7,7 @@ from functools import partial, wraps
 from multiprocessing import Pool
 import networkx as nx
 import numpy as np
-import scipy as sc
+import scipy.sparse as sp
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
@@ -149,7 +149,7 @@ def construct_laplacian(graph,
     if laplacian_type == "normalized":
         # Compute degree vector and normalized Laplacian
         degrees = np.array([graph.degree(i, weight="weight") for i in graph.nodes()])
-        laplacian = sc.sparse.diags(1.0 / degrees).dot(nx.laplacian_matrix(graph))
+        laplacian = sp.diags(1.0 / degrees).dot(nx.laplacian_matrix(graph))
     else:
         raise NotImplementedError("Only 'normalized' Laplacian is implemented.")
 
@@ -157,7 +157,7 @@ def construct_laplacian(graph,
 
     if use_spectral_gap:
         # Compute the spectral gap (second smallest eigenvalue)
-        spectral_gap = abs(sc.sparse.linalg.eigs(laplacian, which="SM", k=2)[0][1])
+        spectral_gap = abs(sp.linalg.eigs(laplacian, which="SM", k=2)[0][1])
         laplacian /= spectral_gap
 
     return laplacian, spectral_gap
@@ -207,7 +207,7 @@ def heat_kernel(laplacian,
     Returns:
     - Result of matrix exponential applied to the measure
     """
-    return sc.sparse.linalg.expm_multiply(-timestep * laplacian, measure)
+    return sp.linalg.expm_multiply(-timestep * laplacian, measure)
 
 
 
