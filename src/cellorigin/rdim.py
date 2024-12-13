@@ -17,7 +17,6 @@ os.environ['OMP_NUM_THREADS'] = '1'       # For OpenMP (used by many libraries)
 os.environ['MKL_NUM_THREADS'] = '1'       # For Intel MKL
 os.environ['OPENBLAS_NUM_THREADS'] = '1'  # For OpenBLAS
 os.environ['NUMEXPR_NUM_THREADS'] = '1'   # For NumExpr
-os.environ['NUMBA_NUM_THREADS'] = '1'     # For Numba
 
 
 
