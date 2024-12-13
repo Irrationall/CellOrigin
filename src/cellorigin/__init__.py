@@ -9,3 +9,6 @@ from .construct_graph import generate_graph
 
 # Import class from stats.py
 from .stats import FatePredictor
+
+# Import plot as pl
+from . import plot as pl
