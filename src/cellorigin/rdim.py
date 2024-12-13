@@ -3,14 +3,14 @@
 import os
 import time
 import warnings
-from functools import partial
+from functools import partial, wraps
 from multiprocessing import Pool
-
 import networkx as nx
 import numpy as np
-import scipy as sc
+import scipy.sparse as sp
 from joblib import Parallel, delayed
 from tqdm import tqdm
+
 
 # Limit the number of threads used by numerical libraries
 os.environ['OMP_NUM_THREADS'] = '1'       # For OpenMP (used by many libraries)
@@ -27,11 +27,12 @@ PRECISION = 1e-8
 
 
 def calc_time(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f"Execution time for {func.__name__}: {end_time - start_time} seconds")
+        print(f"Execution time for {func.__name__}: {end_time - start_time:.2f} seconds")
         return result
     return wrapper
 
@@ -146,7 +147,7 @@ def construct_laplacian(graph,
     if laplacian_type == "normalized":
         # Compute degree vector and normalized Laplacian
         degrees = np.array([graph.degree(i, weight="weight") for i in graph.nodes()])
-        laplacian = sc.sparse.diags(1.0 / degrees).dot(nx.laplacian_matrix(graph))
+        laplacian = sp.diags(1.0 / degrees).dot(nx.laplacian_matrix(graph))
     else:
         raise NotImplementedError("Only 'normalized' Laplacian is implemented.")
 
@@ -154,7 +155,7 @@ def construct_laplacian(graph,
 
     if use_spectral_gap:
         # Compute the spectral gap (second smallest eigenvalue)
-        spectral_gap = abs(sc.sparse.linalg.eigs(laplacian, which="SM", k=2)[0][1])
+        spectral_gap = abs(sp.linalg.eigs(laplacian, which="SM", k=2)[0][1])
         laplacian /= spectral_gap
 
     return laplacian, spectral_gap
@@ -204,7 +205,7 @@ def heat_kernel(laplacian,
     Returns:
     - Result of matrix exponential applied to the measure
     """
-    return sc.sparse.linalg.expm_multiply(-timestep * laplacian, measure)
+    return sp.linalg.expm_multiply(-timestep * laplacian, measure)
 
 
 
@@ -366,11 +367,39 @@ def get_initial_measure(graph,
 
 ### RUN RDIM ###
 @calc_time
-def calculate_relative_dimension(graph: nx.Graph,
+def calculate_relative_dimension(adata: AnnData,
+                                 graph: nx.Graph,
                                  time_arr: np.array,
+                                 reld_key: str = "relative_dimension",
                                  batch_size: int = 1,
-                                num_processes : int = 1) :
-    
-    rdim = run_all_sources(graph, time_arr, batch_size=batch_size, n_workers=num_processes)[0]
+                                num_processes : int = 1
+                                ) :
+    """
+    Calculate the relative dimension matrix and automatically add it to the AnnData object.
 
-    return rdim
+    Parameters:
+    - adata: The input AnnData object.
+    - time_arr: Array of time steps for diffusion.
+    - obsp_key: Key to the graph in obsp.
+    - reld_key: Key to store the relative dimension matrix in obsp.
+    - batch_size: Number of nodes to process in each batch.
+    - num_processes: Number of workers for parallel processing.
+    """
+    
+    # Calculate the relative dimension matrix
+    rdim = run_all_sources(graph, time_arr, batch_size=batch_size, n_workers=num_processes)[0]
+    
+    # Check if nanmin is not 0 and fill NA with 0 for sparse representation
+    nanmin = np.nanmin(rdim)
+    
+    if nanmin != 0:
+        print(f"Minimum non-NaN value in the relative dimension matrix is {nanmin}. Filling NaN values with 0 for sparse representation.")
+        rdim[np.isnan(rdim)] = 0
+        rdim_sparse = sp.csr_matrix(rdim)
+        adata.obsp[reld_key] = rdim_sparse
+        print(f"Relative dimension matrix with key '{reld_key}' added to `adata.obsp` as a sparse matrix.")
+    else:
+        adata.obsp[reld_key] = rdim
+        print(f"Relative dimension matrix with key '{reld_key}' added to `adata.obsp`.")
+
+    return None
