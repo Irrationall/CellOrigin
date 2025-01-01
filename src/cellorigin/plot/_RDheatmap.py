@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from anndata import AnnData
 
-def plot_clustermap(
+def RDheatmap(
     adata: AnnData,
     obsp_key: str = 'RD',
     sort_by: str = 'predicted_fate',
