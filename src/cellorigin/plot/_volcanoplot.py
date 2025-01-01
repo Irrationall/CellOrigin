@@ -27,7 +27,11 @@ def volcanoplot(adata: AnnData,
                 show: bool = True,
                 save: str = None
                 ) :
-    
+    if 'rank_genes_groups' not in adata.uns:
+        raise ValueError(
+            "The 'rank_genes_groups' result is missing from `adata.uns`. "
+            "Please run `sc.tl.rank_genes_groups(adata, groupby='your_grouping_variable')` first."
+        )
     
     df = sc.get.rank_genes_groups_df(adata, group=group)
     df = df[df['pct_nz_group'] >= pct_cutoff]
