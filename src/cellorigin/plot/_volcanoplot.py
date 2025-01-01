@@ -46,7 +46,7 @@ def volcanoplot(adata: AnnData,
     fig, ax = plt.subplots(figsize=figsize)
     
     # Scatter plot for all points
-    sc = ax.scatter(
+    scatter_plot = ax.scatter(
         df['logfoldchanges'],
         df['neg_log10_pvals'],
         c='#99a3a4',
