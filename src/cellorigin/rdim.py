@@ -3,6 +3,7 @@
 import os
 import time
 import warnings
+from anndata import AnnData
 from functools import partial, wraps
 from multiprocessing import Pool
 import networkx as nx
