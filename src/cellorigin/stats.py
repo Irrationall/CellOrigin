@@ -177,7 +177,7 @@ class FatePredictor:
 
             # Set na_value if the maximum is greater than 0 (i.e., there are non-zero values)
             if non_zero_max > 0:
-                na_value = non_zero_max + (non_zero_max - non_zero_min) * 0.01
+                na_value = non_zero_max
             else:
                 na_value = 1  # If all values are 0 or negative, set an arbitrary positive value
 
