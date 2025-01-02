@@ -373,7 +373,7 @@ def calculate_relative_dimension(adata: AnnData,
                                  time_arr: np.array,
                                  reld_key: str = "relative_dimension",
                                  batch_size: int = 1,
-                                num_processes : int = 1
+                                 num_processes : int = 1
                                 ) :
     """
     Calculate the relative dimension matrix and automatically add it to the AnnData object.

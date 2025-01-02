@@ -3,8 +3,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 from anndata import AnnData
+
+from ._plot_utils import create_handles
+
+
+
 
 def RDheatmap(
     adata: AnnData,
@@ -21,6 +25,7 @@ def RDheatmap(
     save_path: Optional[str] = None,
     show_plot: bool = True
 ) -> Optional[plt.Figure]:
+    
     """
     Generates a clustermap from the given AnnData object, replacing NaN values with the maximum value if present,
     otherwise replacing zeros with the maximum value.
@@ -68,6 +73,8 @@ def RDheatmap(
     Optional[plt.Figure]
         The matplotlib figure object if show_plot is False, otherwise None.
     """
+
+
     # Step 1: Validate inputs
     if obsp_key not in adata.obsp:
         raise KeyError(f"'{obsp_key}' not found in adata.obsp")
@@ -101,12 +108,6 @@ def RDheatmap(
     row_colors = []
     col_colors = []
     legends = []  # List of tuples: (group_title, handles, num_labels)
-
-    # Function to create legend handles
-    def create_handles(unique_values, color_dict, marker='o'):
-        return [Line2D([0], [0], marker=marker, color='w', label=val,
-                      markersize=8, markerfacecolor=color_dict[val], markeredgecolor='black')
-                for val in unique_values]
 
     # Process row color mappings
     for key in color_mappings.get('row', []):

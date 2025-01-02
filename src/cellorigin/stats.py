@@ -7,6 +7,9 @@ from tqdm import tqdm
 import numpy as np
 from typing import List, Union
 
+
+
+
 class FatePredictor:
     def __init__(self,
                  adata: AnnData,
@@ -31,6 +34,9 @@ class FatePredictor:
         self.group_by = group_by
         self.source = source
         self.target = target
+
+
+
 
     def _validate_inputs(self):
 
@@ -59,6 +65,9 @@ class FatePredictor:
 
         if len(self.target) < 2:
             raise ValueError("Please specify at least two target clusters for comparison.")
+
+
+
 
     def _create_anndata(self):
         """
@@ -101,6 +110,9 @@ class FatePredictor:
             f"New AnnData created for statistical testing: {len(source_indices)} source × {len(target_indices)} target."
         )
 
+
+
+
     def _resolve_tie(self, na_value):
         """
         Resolves ties in predicted fate by performing pairwise Mann-Whitney U tests.
@@ -139,10 +151,15 @@ class FatePredictor:
                     self.reld_adata.obs.at[row_idx, 'predicted_fate'] = [cluster_b]
                     self.reld_adata.obs.at[row_idx, 'resolve_tie'] = True
 
+
+
+
     def predict_fate(self,
                      resolve_tie: bool = True,
                      na_value: Union[float, str] = "max",
-                     use_fdr: bool = True):
+                     use_fdr: bool = True,
+                     res_to_string: bool = True
+                     ):
 
         """
         Performs statistical tests on the clusters in var for each row in reld_adata.
@@ -171,13 +188,11 @@ class FatePredictor:
 
         # Set na_value (for replacing 0s with a value larger than the maximum)
         if na_value == "max":
-            # Find the maximum of non-zero values
             non_zero_max = self.reld_adata.X.data.max() if sp.issparse(self.reld_adata.X) and np.any(self.reld_adata.X.data != 0) else np.max(self.reld_adata.X[self.reld_adata.X != 0], initial=0)
-            non_zero_min = self.reld_adata.X.data.min() if sp.issparse(self.reld_adata.X) and np.any(self.reld_adata.X.data != 0) else np.min(self.reld_adata.X[self.reld_adata.X != 0], initial=0)
+            #non_zero_min = self.reld_adata.X.data.min() if sp.issparse(self.reld_adata.X) and np.any(self.reld_adata.X.data != 0) else np.min(self.reld_adata.X[self.reld_adata.X != 0], initial=0)
 
-            # Set na_value if the maximum is greater than 0 (i.e., there are non-zero values)
             if non_zero_max > 0:
-                na_value = non_zero_max
+                na_value = non_zero_max + non_zero_max * 0.01
             else:
                 na_value = 1  # If all values are 0 or negative, set an arbitrary positive value
 
@@ -277,9 +292,11 @@ class FatePredictor:
                 return "None"
             else:
                 return " & ".join(lst)
+            
+        if res_to_string :
 
-        self.reld_adata.obs["predicted_fate"] = self.reld_adata.obs[
-            "predicted_fate"
-        ].apply(list_to_string)
+            self.reld_adata.obs["predicted_fate"] = self.reld_adata.obs[
+                "predicted_fate"
+            ].apply(list_to_string)
 
         return None
