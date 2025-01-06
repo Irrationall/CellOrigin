@@ -100,7 +100,8 @@ def calculate_MIC(data, num_processes=None):
 
 
 
-def _prepare_data_for_pca(adata: AnnData, 
+def _prepare_data_for_pca(adata: AnnData,
+                          layer: str, 
                           use_highly_variable: bool, 
                           hv_kwargs: Dict, 
                           use_scale: bool) -> AnnData:
@@ -117,27 +118,30 @@ def _prepare_data_for_pca(adata: AnnData,
     - adata: Prepared AnnData object
     """
 
+    if hv_kwargs is None:
+        hv_kwargs = {}
+
     if use_highly_variable:
         sc.pp.highly_variable_genes(adata, **hv_kwargs)
         logger.info(f"Found {adata.var.highly_variable.sum()} highly variable genes.")
     
     if use_scale:
-        sc.pp.scale(adata)
+        sc.pp.scale(adata, layer=layer)
         logger.info("Data scaled before PCA.")
 
     if use_highly_variable:
         if version.parse(sc.__version__) >= version.parse("1.10.0"):
             # Use `mask_var` argument for Scanpy versions >= 1.10.0
             logger.info("Using `mask_var='highly_variable'` for PCA.")
-            sc.pp.pca(adata, mask_var='highly_variable')
+            sc.pp.pca(adata, layer=layer, mask_var='highly_variable')
 
         else:
             # Use `use_highly_variable` argument for older Scanpy versions
             logger.info("Using `use_highly_variable=True` for PCA (deprecated in scanpy 1.10.0).")
-            sc.pp.pca(adata, use_highly_variable=True)
+            sc.pp.pca(adata, layer=layer, use_highly_variable=True)
     else:
         # PCA without subsetting to HVGs
-        sc.pp.pca(adata)
+        sc.pp.pca(adata, layer=layer)
         logger.info("PCA performed without subsetting to HVGs.")
 
     logger.info("PCA completed.")
@@ -153,6 +157,7 @@ logger = logging.getLogger(__name__)
 def generate_mi_mat(adata, 
                      use_highly_variable: bool = False,
                      hv_kwargs: Optional[Dict] = None,
+                     layer: Optional[str] = None,
                      use_scale: bool = False,
                      n_components: int = 30,
                      num_processes: int = 1,
@@ -164,7 +169,8 @@ def generate_mi_mat(adata,
     Parameters:
     - adata: AnnData object
     - use_highly_variable: Whether to use highly variable genes for PCA
-    - hv_kwargs: Dictionary of keyword arguments for `sc.pp.highly_variable_genes`
+    - hv_kwargs: Dictionary of keyword arguments for `sc.pp.highly_variable_genes`. Independent from 'layer' parameter.
+    - layer: Which element of layers to use for scailing and PCA. Independent from 'hv_kwargs'. It means you can use different layer to perform PCA or find HVGs. If `None`, uses `adata.X`.
     - use_scale: Whether to scale the data before PCA
     - subset: Whether to subset to highly variable genes
     - n_components: Number of PCA components to use
@@ -173,12 +179,17 @@ def generate_mi_mat(adata,
     - mi_key: Key to store the MIC matrix in `adata.obsp`
 
     Returns:
-    - adata: AnnData object with MIC matrix stored in `adata.obsp[mi_key]`
+    - adata: AnnData object with MIC matrix stored in `adata.obsp[mic_key]`
     """
     _adata = adata.copy()
 
+    if layer is not None and layer not in adata.layers:
+        raise ValueError(f"Specified layer '{layer}' does not exist in adata.layers.")
+
     # Check if PCA is already computed and can be reused
     if 'X_pca' in _adata.obsm and not force_PCA:
+        if layer is not None :
+            logger.warning(f"Layer '{layer}' specified but existing PCA matrix will be reused.")
         logger.info('X_pca already in adata.obsm. Using existing PCA matrix.')
         pca_mat = _adata.obsm['X_pca'][:, :n_components]
 
@@ -189,7 +200,7 @@ def generate_mi_mat(adata,
         else:
             logger.info("Performing PCA with assigned parameters.")
         
-        _adata = _prepare_data_for_pca(_adata, use_highly_variable, hv_kwargs, use_scale)
+        _adata = _prepare_data_for_pca(_adata, layer, use_highly_variable, hv_kwargs, use_scale)
         pca_mat = _adata.obsm['X_pca'][:, :n_components]
         
     # Calculate MIC matrix
