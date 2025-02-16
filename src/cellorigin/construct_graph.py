@@ -6,7 +6,21 @@ import scipy.sparse as sp
 import scanpy as sc
 from tqdm import tqdm
 from functools import wraps
+import logging
 import time
+
+
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler() 
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -17,7 +31,7 @@ def calc_time(func):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f"Execution time for {func.__name__}: {end_time - start_time:.2f} seconds")
+        print(f"⏳ Execution time for {func.__name__}: {end_time - start_time:.2f} seconds")
         return result
     return wrapper
 
@@ -202,19 +216,19 @@ def generate_graph(adata: AnnData,
         
         target_edges = matrix.shape[0] * number_of_multiples
 
-        print(f"Target number of edges: {target_edges}")
+        logger.info("🎯 Target number of edges: %d", target_edges)
 
         graph, threshold = _generate_graph_multiples(matrix, target_edges)
 
         # Warn if the graph has disconnected components
         if nx.number_connected_components(graph) > 1:
-            warnings.warn("The graph has more than one connected component.")
+            logger.warning("⚠️ The graph has more than one connected component.")
 
     # Print graph statistics
-    print(f"MIC threshold: {threshold}")
-    print(f"Number of nodes: {len(graph.nodes())}")
-    print(f"Number of edges: {len(graph.edges())}")
-    print(f"Is graph connected: {nx.is_connected(graph)}")
-    print(f"Number of connected components: {nx.number_connected_components(graph)}")
+    logger.info("🛈 MIC threshold: %.6e", threshold)
+    logger.info("🛈 Number of nodes: %d", len(graph.nodes()))
+    logger.info("🛈 Number of edges: %d", len(graph.edges()))
+    logger.info("🛈 Is graph connected: %s", nx.is_connected(graph))
+    logger.info("🛈 Number of connected components: %d", nx.number_connected_components(graph))
 
     return graph, threshold

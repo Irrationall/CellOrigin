@@ -34,7 +34,7 @@ def calc_time(func):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f"Execution time for {func.__name__}: {end_time - start_time:.2f} seconds")
+        logger.info("⏳ Function '%s' executed in %.2f seconds", func.__name__, end_time - start_time)
         return result
     return wrapper
 
@@ -189,22 +189,22 @@ def generate_mi_mat(adata,
     # Check if PCA is already computed and can be reused
     if 'X_pca' in _adata.obsm and not force_PCA:
         if layer is not None :
-            logger.warning(f"Layer '{layer}' specified but existing PCA matrix will be reused.")
-        logger.info('X_pca already in adata.obsm. Using existing PCA matrix.')
+            logger.warning("⚠️ Layer '%s' specified but existing PCA matrix will be reused.", layer)
+        logger.info('✅ X_pca already in adata.obsm. Using existing PCA matrix.')
         pca_mat = _adata.obsm['X_pca'][:, :n_components]
 
     else:
         if 'X_pca' in _adata.obsm and force_PCA:
-            logger.info("Force PCA is enabled. Recomputing PCA and overwriting existing X_pca.")
+            logger.info("✅ Force PCA is enabled. Recomputing PCA and overwriting existing X_pca.")
             
         else:
-            logger.info("Performing PCA with assigned parameters.")
+            logger.info("✅ Performing PCA with assigned parameters.")
         
         _adata = _prepare_data_for_pca(_adata, layer, use_highly_variable, hv_kwargs, use_scale)
         pca_mat = _adata.obsm['X_pca'][:, :n_components]
         
     # Calculate MIC matrix
-    logger.info("Calculating MIC matrix...")
+    logger.info("✅ Calculating MIC matrix...")
     mi_matrix = calculate_MIC(pca_mat, num_processes=num_processes)
 
     # Set diagonal elements to zero (self-MIC not meaningful)
@@ -212,7 +212,7 @@ def generate_mi_mat(adata,
 
     # Store MIC matrix in the AnnData object
     adata.obsp[mic_key] = mi_matrix
-    logger.info(f"MIC matrix stored in adata.obsp[{mic_key}].")
+    logger.info("✅ MIC matrix stored in adata.obsp[%s].", mic_key)
 
     return adata
 

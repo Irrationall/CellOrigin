@@ -3,6 +3,7 @@
 import os
 import time
 import warnings
+import logging
 from anndata import AnnData
 from functools import partial, wraps
 from multiprocessing import Pool
@@ -22,7 +23,25 @@ os.environ['NUMEXPR_NUM_THREADS'] = '1'   # For NumExpr
 
 
 # Constants
+
+# extract_relative_dimensions_vectorized
 PRECISION = 1e-8
+# construct_laplacian
+SGAP_THRESHOLD = 1e-3
+CNVG_THRESHOLD = 1e-6
+
+
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -33,7 +52,7 @@ def calc_time(func):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f"Execution time for {func.__name__}: {end_time - start_time:.2f} seconds")
+        logger.info("⏳ Function '%s' executed in %.2f seconds", func.__name__, end_time - start_time)
         return result
     return wrapper
 
@@ -102,7 +121,7 @@ def run_all_sources(
     np.fill_diagonal(relative_dimensions, np.nan)
     np.fill_diagonal(peak_times, np.nan)
 
-    print("All sources processed.")
+    logger.info("✅ All sources processed.")
     return relative_dimensions, peak_times
 
 
@@ -134,7 +153,7 @@ def construct_laplacian(graph,
                         laplacian_type="normalized", 
                         use_spectral_gap=True):
     """
-    Construct the graph Laplacian matrix.
+    Construct the graph Laplacian matrix with stable spectral gap handling.
 
     Parameters:
     - graph: NetworkX graph
@@ -145,6 +164,7 @@ def construct_laplacian(graph,
     - laplacian: Sparse Laplacian matrix
     - spectral_gap: Spectral gap of the Laplacian
     """
+    
     if laplacian_type == "normalized":
         # Compute degree vector and normalized Laplacian
         degrees = np.array([graph.degree(i, weight="weight") for i in graph.nodes()])
@@ -152,15 +172,42 @@ def construct_laplacian(graph,
     else:
         raise NotImplementedError("Only 'normalized' Laplacian is implemented.")
 
-    spectral_gap = 1.0
-
+    spectral_gap = 1.0  # Default to 1
+    
     if use_spectral_gap:
-        # Compute the spectral gap (second smallest eigenvalue)
-        spectral_gap = abs(sp.linalg.eigs(laplacian, which="SM", k=2)[0][1])
+        try:
+            # Compute spectral gap multiple times to check for stability
+            spectral_gap_values = np.array([abs(sp.sparse.linalg.eigs(laplacian, which="SM", k=2)[0][1]) for _ in range(10)])
+            max_diff = max(spectral_gap_values) - min(spectral_gap_values)
+            spectral_gap = spectral_gap_values[0]
+
+            spectral_gap_max = spectral_gap_values.max()
+            
+            # Ensure spectral gap meets stability criteria
+            if spectral_gap_max < SGAP_THRESHOLD or max_diff > CNVG_THRESHOLD:
+                
+                reason = []
+                
+                if spectral_gap_max < SGAP_THRESHOLD:
+                    reason.append(f"too small ({spectral_gap_max:.6e} < {SGAP_THRESHOLD})")
+                if max_diff > CNVG_THRESHOLD:
+                    reason.append(f"unstable (max diff: {max_diff:.6e} > {CNVG_THRESHOLD})")
+                    
+                reason_str = " and ".join(reason)
+                logger.warning("⚠️ NOTICE: Spectral gap is %s. Setting to 1.", reason_str)
+
+                
+                spectral_gap = 1.0
+
+        except Exception as e:
+            logger.exception("⚠️ eigs() failed. Setting spectral gap to 1.")
+            spectral_gap = 1.0
+            
+        logger.info("Parameter spectral_gap set to %.6e", spectral_gap)
+
         laplacian /= spectral_gap
 
     return laplacian, spectral_gap
-
 
 
 
@@ -371,6 +418,7 @@ def get_initial_measure(graph,
 def calculate_relative_dimension(adata: AnnData,
                                  graph: nx.Graph,
                                  time_arr: np.array,
+                                 use_spectral_gap = True,
                                  reld_key: str = "relative_dimension",
                                  batch_size: int = 1,
                                  num_processes : int = 1
@@ -388,19 +436,19 @@ def calculate_relative_dimension(adata: AnnData,
     """
     
     # Calculate the relative dimension matrix
-    rdim = run_all_sources(graph, time_arr, batch_size=batch_size, n_workers=num_processes)[0]
+    rdim = run_all_sources(graph, time_arr, batch_size=batch_size, n_workers=num_processes, use_spectral_gap=use_spectral_gap)[0]
     
     # Check if nanmin is not 0 and fill NA with 0 for sparse representation
     nanmin = np.nanmin(rdim)
     
     if nanmin != 0:
-        print(f"Minimum non-NaN value in the relative dimension matrix is {nanmin}. Filling NaN values with 0 for sparse representation.")
+        logger.info("✅ Minimum non-NaN value in the relative dimension matrix is %.6e. Filling NaN values with 0 for sparse representation.", nanmin)
         rdim[np.isnan(rdim)] = 0
         rdim_sparse = sp.csr_matrix(rdim)
         adata.obsp[reld_key] = rdim_sparse
-        print(f"Relative dimension matrix with key '{reld_key}' added to `adata.obsp` as a sparse matrix.")
+        logger.info("✅ Relative dimension matrix with key '%s' added to `adata.obsp` as a sparse matrix.", reld_key)
     else:
         adata.obsp[reld_key] = rdim
-        print(f"Relative dimension matrix with key '{reld_key}' added to `adata.obsp`.")
+        logger.info("✅ Relative dimension matrix with key '%s' added to `adata.obsp`.", reld_key)
 
     return None
