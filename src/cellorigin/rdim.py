@@ -177,7 +177,7 @@ def construct_laplacian(graph,
     if use_spectral_gap:
         try:
             # Compute spectral gap multiple times to check for stability
-            spectral_gap_values = np.array([abs(sp.sparse.linalg.eigs(laplacian, which="SM", k=2)[0][1]) for _ in range(10)])
+            spectral_gap_values = np.array([abs(sp.linalg.eigs(laplacian, which="SM", k=2)[0][1]) for _ in range(10)])
             max_diff = max(spectral_gap_values) - min(spectral_gap_values)
             spectral_gap = spectral_gap_values[0]
 
