@@ -95,12 +95,12 @@ def stacked_bar(adata: AnnData,
     # Handle output
     if save:
         fig.savefig(save, dpi=300, bbox_inches='tight')
-        
+    
+    if return_fig:
+        return fig, ax  # Let user handle show()
+    
     if show:
         plt.tight_layout()
         plt.show()
     else:
         plt.close(fig)
-
-    if return_fig:
-        return fig, ax
